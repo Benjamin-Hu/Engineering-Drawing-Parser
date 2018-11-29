@@ -36,7 +36,7 @@ class TestPanel(wx.Panel):
         self.Bind(wx.EVT_BUTTON, self.OnLoadButton, loadbutton)
 
     def OnLoadButton(self, event):
-        dlg = wx.FileDialog(self, wildcard=r"C:\Users\benjamin.hu\Downloads\FBM-00287-001_REV_C.PDF.pdf")
+        dlg = wx.FileDialog(self, wildcard=r"*.pdf")
         if dlg.ShowModal() == wx.ID_OK:
             wx.BeginBusyCursor()
             self.viewer.LoadFile(dlg.GetPath())
