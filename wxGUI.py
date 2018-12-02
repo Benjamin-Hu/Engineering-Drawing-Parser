@@ -8,7 +8,7 @@ try:
 except ImportError:
     havePyPdf = False
 
-#----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 
 class TestPanel(wx.Panel):
     def __init__(self, parent, log):
@@ -22,9 +22,15 @@ class TestPanel(wx.Panel):
         self.viewer = pdfViewer( self, wx.ID_ANY, wx.DefaultPosition,
                                 wx.DefaultSize, wx.HSCROLL|wx.VSCROLL|wx.SUNKEN_BORDER)
         vsizer.Add(self.viewer, 1, wx.GROW|wx.LEFT|wx.RIGHT|wx.BOTTOM, 5)
+
         loadbutton = wx.Button(self, wx.ID_ANY, "Load PDF file",
                                 wx.DefaultPosition, wx.DefaultSize, 0 )
         vsizer.Add(loadbutton, 0, wx.ALIGN_CENTER|wx.ALL, 5)
+
+        addbutton = wx.Button(self, wx.ID_ANY, "Add Dimension",
+                                wx.DefaultPosition, wx.DefaultSize, 0 )
+        vsizer.Add(addbutton, 0, wx.ALIGN_CENTER | wx.ALL, 5)
+
         hsizer.Add(vsizer, 1, wx.GROW|wx.ALIGN_CENTER_HORIZONTAL|wx.ALL, 5)
         self.SetSizer(hsizer)
         self.SetAutoLayout(True)
@@ -35,6 +41,9 @@ class TestPanel(wx.Panel):
 
         self.Bind(wx.EVT_BUTTON, self.OnLoadButton, loadbutton)
 
+        add_points = []
+        addbutton.Bind(wx.EVT_BUTTON, lambda event: self.OnAddButton(event, add_points))
+
     def OnLoadButton(self, event):
         dlg = wx.FileDialog(self, wildcard=r"*.pdf")
         if dlg.ShowModal() == wx.ID_OK:
@@ -43,7 +52,22 @@ class TestPanel(wx.Panel):
             wx.EndBusyCursor()
         dlg.Destroy()
 
-#----------------------------------------------------------------------
+    def OnAddButton(self, event, add_list):
+        print("Adding values...")
+        self.viewer.Bind(wx.EVT_LEFT_DOWN, lambda event: self.ChooseLeftClick(event, add_list))
+
+    def ChooseLeftClick(self, event, point_list):
+        panel_point = self.viewer.ScreenToClient(wx.GetMousePosition())
+        pointwx = wx.Point(0,0)
+        scrolled = self.viewer.CalcUnscrolledPosition(pointwx)
+        print(scrolled)
+        print(panel_point)
+        scrolled.__iadd__(panel_point)
+        print(scrolled)
+        point_list.append(scrolled)
+        print(point_list)
+
+# ---------------------------------------------------------------------
 
 def runTest(frame, nb, log):
     if havePyPdf:
