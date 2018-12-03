@@ -1,50 +1,51 @@
-# Forked from wxPython
+# run.py forked from wxPython
 
 import wx
 import sys
-
-try:
-    from wx.lib.pdfviewer import pdfViewer, pdfButtonPanel
-    havePyPdf = True
-except ImportError:
-    havePyPdf = False
+from wx.lib.pdfviewer import pdfViewer, pdfButtonPanel
 
 # ----------------------------------------------------------------------
 
 
 class TestPanel(wx.Panel):
-    def __init__(self, parent):
+    def __init__(self, parent, edit_mode):
+        # Setting up panel and sizers
         wx.Panel.__init__(self, parent, -1)
         hsizer = wx.BoxSizer( wx.HORIZONTAL )
         vsizer = wx.BoxSizer( wx.VERTICAL )
-        self.buttonpanel = pdfButtonPanel(self, wx.ID_ANY,
-                                wx.DefaultPosition, wx.DefaultSize, 0)
-        vsizer.Add(self.buttonpanel, 0,
-                                wx.GROW|wx.ALIGN_CENTER_VERTICAL|wx.LEFT|wx.RIGHT|wx.TOP, 5)
-        self.viewer = pdfViewer( self, wx.ID_ANY, wx.DefaultPosition,
-                                wx.DefaultSize, wx.HSCROLL|wx.VSCROLL|wx.SUNKEN_BORDER)
+
+        # Special wxpython PDF button panel
+        self.buttonpanel = pdfButtonPanel(self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, 0)
+
+        # PDF viewer
+        self.viewer = pdfViewer(self,wx.ID_ANY,wx.DefaultPosition,wx.DefaultSize,wx.HSCROLL|wx.VSCROLL|wx.SUNKEN_BORDER)
+
+        # Adding button panel and viewer to vertical sizer
+        vsizer.Add(self.buttonpanel, 0, wx.GROW|wx.ALIGN_CENTER_VERTICAL|wx.LEFT|wx.RIGHT|wx.TOP, 5)
         vsizer.Add(self.viewer, 1, wx.GROW|wx.LEFT|wx.RIGHT|wx.BOTTOM, 5)
 
-        loadbutton = wx.Button(self, wx.ID_ANY, "Load PDF file",
-                                wx.DefaultPosition, wx.DefaultSize, 0 )
+        # Adding relevant buttons (or none at all)
+        loadbutton = wx.Button(self, wx.ID_ANY, "Load PDF file", wx.DefaultPosition, wx.DefaultSize, 0)
         vsizer.Add(loadbutton, 0, wx.ALIGN_CENTER|wx.ALL, 5)
-
-        addbutton = wx.Button(self, wx.ID_ANY, "Add Dimension",
+        if edit_mode:
+            addbutton = wx.Button(self, wx.ID_ANY, "Add Dimension",
                                 wx.DefaultPosition, wx.DefaultSize, 0 )
-        vsizer.Add(addbutton, 0, wx.ALIGN_CENTER | wx.ALL, 5)
+            vsizer.Add(addbutton, 0, wx.ALIGN_CENTER | wx.ALL, 5)
 
+        # Completing sizing setup
         hsizer.Add(vsizer, 1, wx.GROW|wx.ALIGN_CENTER_HORIZONTAL|wx.ALL, 5)
         self.SetSizer(hsizer)
         self.SetAutoLayout(True)
 
-        # introduce buttonpanel and viewer to each other
+        # Introduce button panel and viewer to each other
         self.buttonpanel.viewer = self.viewer
         self.viewer.buttonpanel = self.buttonpanel
 
+        # Binding all of the buttons
         self.Bind(wx.EVT_BUTTON, self.OnLoadButton, loadbutton)
-
-        add_points = []
-        addbutton.Bind(wx.EVT_BUTTON, lambda event: self.OnAddButton(event, add_points))
+        if edit_mode:
+            add_points = []
+            addbutton.Bind(wx.EVT_BUTTON, lambda event: self.OnAddButton(event, add_points))
 
     def OnLoadButton(self, event):
         dlg = wx.FileDialog(self, wildcard=r"*.pdf")
@@ -56,9 +57,10 @@ class TestPanel(wx.Panel):
 
     def OnAddButton(self, event, add_list):
         print("Adding values...")
-        self.viewer.Bind(wx.EVT_LEFT_DOWN, lambda event: self.ChooseLeftClick(event, add_list))
+        self.viewer.Bind(wx.EVT_LEFT_DOWN, lambda event: self.AddLeftClick(event, add_list))
 
-    def ChooseLeftClick(self, event, point_list):
+    # Able to take any relevant lists
+    def AddLeftClick(self, event, point_list):
         panel_point = self.viewer.ScreenToClient(wx.GetMousePosition())
         pointwx = wx.Point(0,0)
         scrolled = self.viewer.CalcUnscrolledPosition(pointwx)
@@ -69,43 +71,36 @@ class TestPanel(wx.Panel):
         point_list.append(scrolled)
         print(point_list)
 
-# ---------------------------------------------------------------------
-
-
-def runTest(frame, nb, log):
-    if havePyPdf:
-        win = TestPanel(nb, log)
-        return win
-    else:
-        from wx.lib.msgpanel import MessagePanel
-        win = MessagePanel(nb,
-                           'This demo requires either the\n'
-                           'PyMuPDF see http://pythonhosted.org/PyMuPDF\n'
-                           'or\n'
-                           'PyPDF2 see http://pythonhosted.org/PyPDF2\n'
-                           'package installed.\n',
-                           'Sorry', wx.ICON_WARNING)
-        return win
-
 # ----------------------------------------------------------------------
 
 
 class FullApp(wx.App):
     def __init__(self):
+        # Setting up the app
         wx.App.__init__(self, redirect=False)
         self.frame = wx.Frame(None, -1, "Engineering Drawing Parser", size=(600, 500))
-        self.frame.CreateStatusBar()
 
+        # Creating a menu bar and proper window features
+        self.frame.CreateStatusBar()
         menuBar = wx.MenuBar()
         menu = wx.Menu()
         item = menu.Append(wx.ID_EXIT, "Exit\tCtrl-Q", "Exit demo")
         self.Bind(wx.EVT_MENU, self.OnExitApp, item)
         menuBar.Append(menu, "&File")
-
         self.frame.SetMenuBar(menuBar)
-        panel = TestPanel(self.frame)
-        self.frame.Show(True)
         self.frame.Bind(wx.EVT_CLOSE, self.OnCloseFrame)
+
+        # User begins to choose their options and files
+        dlg = wx.FileDialog(self.frame, wildcard=r"*.pdf")
+        if dlg.ShowModal() == wx.ID_OK:
+            wx.BeginBusyCursor()
+            upload_file = dlg.GetPath()
+            wx.EndBusyCursor()
+        dlg.Destroy()
+
+        # Setting up the panel now that requested option is known
+        panel = TestPanel(self.frame, True)
+        self.frame.Show(True)
 
     def OnExitApp(self, evt):
         self.frame.Close(True)
@@ -118,7 +113,7 @@ class FullApp(wx.App):
 # ----------------------------------------------------------------------
 
 
-# stuff for debugging
+# Print versions for debugging purposes
 print("Python %s" % sys.version)
 print("wx.version: %s" % wx.version())
 

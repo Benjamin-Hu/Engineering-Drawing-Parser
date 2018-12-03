@@ -3,8 +3,6 @@ import dimensionFilter
 import draw
 from draw import BOX_UNIT
 import GUI
-import tkinter as tk
-from tkinter import filedialog
 import os
 import sys
 import PySimpleGUI as sg
