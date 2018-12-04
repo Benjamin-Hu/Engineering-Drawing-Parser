@@ -7,12 +7,49 @@ from wx.lib.pdfviewer import pdfViewer, pdfButtonPanel
 # ----------------------------------------------------------------------
 
 
-class TestPanel(wx.Panel):
+class menuPanel(wx.Panel):
+    def __init__(self, parent):
+        # Setting up panel and sizers
+        wx.Panel.__init__(self, parent, -1)
+        vsizer = wx.BoxSizer(wx.VERTICAL)
+        hsizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        # Adding relevant buttons and images
+        image = wx.Image('logo.png', wx.BITMAP_TYPE_ANY)
+        image.Rescale(200, 200, wx.IMAGE_QUALITY_HIGH)
+        imageBitmap = wx.StaticBitmap(self, wx.ID_ANY, wx.Bitmap(image))
+        vsizer.Add(imageBitmap, 0, wx.ALIGN_CENTER | wx.ALL, 5)
+
+        lineDivider = wx.StaticLine(self, id=wx.ID_ANY, pos=wx.DefaultPosition, size=wx.DefaultSize, style=wx.LI_HORIZONTAL)
+        vsizer.Add(lineDivider, 0, wx.ALL | wx.EXPAND, 5)
+
+        self.aboutButton = wx.Button(self, wx.ID_ANY, "About", wx.DefaultPosition, wx.DefaultSize, 0)
+        vsizer.Add(self.aboutButton, 0, wx.ALIGN_CENTER|wx.ALL, 5)
+
+        self.parseButton = wx.Button(self, wx.ID_ANY, "Parse a Bubbled Drawing", wx.DefaultPosition, wx.DefaultSize, 0 )
+        vsizer.Add(self.parseButton, 0, wx.ALIGN_CENTER | wx.ALL, 5)
+
+        self.manualButton = wx.Button(self, wx.ID_ANY, "Manually Bubble a Drawing", wx.DefaultPosition, wx.DefaultSize, 0)
+        vsizer.Add(self.manualButton, 0, wx.ALIGN_CENTER | wx.ALL, 5)
+
+        # Completing sizing setup
+        hsizer.Add(vsizer, 1, wx.GROW|wx.ALIGN_CENTER_HORIZONTAL|wx.ALL, 5)
+        self.SetSizer(hsizer)
+        self.SetAutoLayout(True)
+
+        # Binding all of the buttons
+
+
+
+# ----------------------------------------------------------------------
+
+
+class viewerPanel(wx.Panel):
     def __init__(self, parent, edit_mode):
         # Setting up panel and sizers
         wx.Panel.__init__(self, parent, -1)
-        hsizer = wx.BoxSizer( wx.HORIZONTAL )
-        vsizer = wx.BoxSizer( wx.VERTICAL )
+        hsizer = wx.BoxSizer(wx.HORIZONTAL)
+        vsizer = wx.BoxSizer(wx.VERTICAL)
 
         # Special wxpython PDF button panel
         self.buttonpanel = pdfButtonPanel(self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, 0)
@@ -28,8 +65,7 @@ class TestPanel(wx.Panel):
         loadbutton = wx.Button(self, wx.ID_ANY, "Load PDF file", wx.DefaultPosition, wx.DefaultSize, 0)
         vsizer.Add(loadbutton, 0, wx.ALIGN_CENTER|wx.ALL, 5)
         if edit_mode:
-            addbutton = wx.Button(self, wx.ID_ANY, "Add Dimension",
-                                wx.DefaultPosition, wx.DefaultSize, 0 )
+            addbutton = wx.Button(self, wx.ID_ANY, "Add Dimension", wx.DefaultPosition, wx.DefaultSize, 0 )
             vsizer.Add(addbutton, 0, wx.ALIGN_CENTER | wx.ALL, 5)
 
         # Completing sizing setup
@@ -74,41 +110,73 @@ class TestPanel(wx.Panel):
 # ----------------------------------------------------------------------
 
 
-class FullApp(wx.App):
+class FullFrame(wx.Frame):
     def __init__(self):
         # Setting up the app
-        wx.App.__init__(self, redirect=False)
-        self.frame = wx.Frame(None, -1, "Engineering Drawing Parser", size=(600, 500))
+        wx.Frame.__init__(self, parent=None, title="Engineering Drawing Parser", size=(1024, 576))
+        self.CenterOnScreen()
 
         # Creating a menu bar and proper window features
-        self.frame.CreateStatusBar()
+        self.CreateStatusBar()
         menuBar = wx.MenuBar()
         menu = wx.Menu()
+        self.SetMenuBar(menuBar)
+
         item = menu.Append(wx.ID_EXIT, "Exit\tCtrl-Q", "Exit demo")
         self.Bind(wx.EVT_MENU, self.OnExitApp, item)
         menuBar.Append(menu, "&File")
-        self.frame.SetMenuBar(menuBar)
-        self.frame.Bind(wx.EVT_CLOSE, self.OnCloseFrame)
+        self.Bind(wx.EVT_CLOSE, self.OnCloseFrame)
 
-        # User begins to choose their options and files
-        dlg = wx.FileDialog(self.frame, wildcard=r"*.pdf")
+        # Setting up main menu and viewer panels
+        self.menu = menuPanel(self)
+        self.viewPanel = viewerPanel(self, None)
+        self.viewPanel.Hide()
+
+        self.sizer = wx.BoxSizer(wx.VERTICAL)
+        self.sizer.Add(self.menu, 1, wx.EXPAND)
+        self.sizer.Add(self.viewPanel, 1, wx.EXPAND)
+        self.SetSizer(self.sizer)
+
+        # Binding relevant buttons from lower level panels
+        edit_mode = None
+        self.menu.manualButton.Bind(wx.EVT_BUTTON, lambda event: self.OnManualButton(event, edit_mode))
+
+
+        '''
+        dlg = wx.FileDialog(self.viewFrame, wildcard=r"*.pdf")
         if dlg.ShowModal() == wx.ID_OK:
             wx.BeginBusyCursor()
             upload_file = dlg.GetPath()
             wx.EndBusyCursor()
         dlg.Destroy()
+        '''
 
         # Setting up the panel now that requested option is known
-        panel = TestPanel(self.frame, True)
-        self.frame.Show(True)
+
+
 
     def OnExitApp(self, evt):
-        self.frame.Close(True)
+        self.Close(True)
 
     def OnCloseFrame(self, evt):
         if hasattr(self, "window") and hasattr(self.window, "ShutdownDemo"):
             self.window.ShutdownDemo()
         evt.Skip()
+
+    def onSwitchPanels(self, event):
+        if self.viewPanel.IsShown():
+            self.viewPanel.Hide()
+            self.menu.Show()
+        else:
+            self.viewPanel.Show()
+            self.menu.Hide()
+        self.Layout()
+
+    def OnManualButton(self, event, edit):
+        edit = True
+        self.viewPanel.Show()
+        self.menu.Hide()
+        self.Layout()
 
 # ----------------------------------------------------------------------
 
@@ -117,5 +185,7 @@ class FullApp(wx.App):
 print("Python %s" % sys.version)
 print("wx.version: %s" % wx.version())
 
-app = FullApp()
+app = wx.App(False)
+frame = FullFrame()
+frame.Show()
 app.MainLoop()
