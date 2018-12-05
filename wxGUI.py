@@ -3,6 +3,7 @@
 import wx
 import sys
 from wx.lib.pdfviewer import pdfViewer, pdfButtonPanel
+import wx.adv
 
 # ----------------------------------------------------------------------
 
@@ -23,23 +24,22 @@ class menuPanel(wx.Panel):
         lineDivider = wx.StaticLine(self, id=wx.ID_ANY, pos=wx.DefaultPosition, size=wx.DefaultSize, style=wx.LI_HORIZONTAL)
         vsizer.Add(lineDivider, 0, wx.ALL | wx.EXPAND, 5)
 
-        self.aboutButton = wx.Button(self, wx.ID_ANY, "About", wx.DefaultPosition, wx.DefaultSize, 0)
-        vsizer.Add(self.aboutButton, 0, wx.ALIGN_CENTER|wx.ALL, 5)
-
         self.parseButton = wx.Button(self, wx.ID_ANY, "Parse a Bubbled Drawing", wx.DefaultPosition, wx.DefaultSize, 0 )
         vsizer.Add(self.parseButton, 0, wx.ALIGN_CENTER | wx.ALL, 5)
 
         self.manualButton = wx.Button(self, wx.ID_ANY, "Manually Bubble a Drawing", wx.DefaultPosition, wx.DefaultSize, 0)
         vsizer.Add(self.manualButton, 0, wx.ALIGN_CENTER | wx.ALL, 5)
 
+        self.autoButton = wx.Button(self, wx.ID_ANY, "Automatically Bubble a Drawing", wx.DefaultPosition, wx.DefaultSize, 0)
+        vsizer.Add(self.autoButton, 0, wx.ALIGN_CENTER | wx.ALL, 5)
+
+        self.aboutButton = wx.Button(self, wx.ID_ANY, "About", wx.DefaultPosition, wx.DefaultSize, 0)
+        vsizer.Add(self.aboutButton, 0, wx.ALIGN_CENTER|wx.ALL, 5)
+
         # Completing sizing setup
         hsizer.Add(vsizer, 1, wx.GROW|wx.ALIGN_CENTER_HORIZONTAL|wx.ALL, 5)
         self.SetSizer(hsizer)
         self.SetAutoLayout(True)
-
-        # Binding all of the buttons
-
-
 
 # ----------------------------------------------------------------------
 
@@ -64,7 +64,10 @@ class viewerPanel(wx.Panel):
         # Adding relevant buttons (or none at all)
         self.loadbutton = wx.Button(self, wx.ID_ANY, "Load PDF file", wx.DefaultPosition, wx.DefaultSize, 0)
         self.vsizer.Add(self.loadbutton, 0, wx.ALIGN_CENTER|wx.ALL, 5)
-        self.addbutton = wx.Button(self, wx.ID_ANY, "Add Dimension", wx.DefaultPosition, wx.DefaultSize, 0 )
+
+        self.addbutton = wx.Button(self, wx.ID_ANY, "Add Dimension", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.vsizer.Add(self.addbutton, 0, wx.ALIGN_CENTER | wx.ALL, 5)
+        self.addbutton.Hide()
 
         # Completing sizing setup
         self.hsizer.Add(self.vsizer, 1, wx.GROW|wx.ALIGN_CENTER_HORIZONTAL|wx.ALL, 5)
@@ -115,12 +118,16 @@ class FullFrame(wx.Frame):
         # Creating a menu bar and proper window features
         self.CreateStatusBar()
         menuBar = wx.MenuBar()
-        menu = wx.Menu()
+        menuOption = wx.Menu()
         self.SetMenuBar(menuBar)
 
-        item = menu.Append(wx.ID_EXIT, "Exit\tCtrl-Q", "Exit demo")
-        self.Bind(wx.EVT_MENU, self.OnExitApp, item)
-        menuBar.Append(menu, "&File")
+        menuBar.Append(menuOption, "&File")
+        aboutMe = menuOption.Append(wx.ID_ANY, "&About")
+        self.Bind(wx.EVT_MENU, self.OnAboutBox, aboutMe)
+        mainMenu = menuOption.Append(wx.ID_ANY, "&Main Menu\tEsc")
+        self.Bind(wx.EVT_MENU, self.OnMainMenu, mainMenu)
+        exit = menuOption.Append(wx.ID_EXIT, "Exit\tCtrl+Q", "Exit Program")
+        self.Bind(wx.EVT_MENU, self.OnExitApp, exit)
         self.Bind(wx.EVT_CLOSE, self.OnCloseFrame)
 
         # Setting up main menu and viewer panels
@@ -136,7 +143,8 @@ class FullFrame(wx.Frame):
         # Binding relevant buttons from lower level panels
         edit_mode = None
         self.menu.manualButton.Bind(wx.EVT_BUTTON, lambda event: self.OnManualButton(event, edit_mode))
-
+        self.menu.parseButton.Bind(wx.EVT_BUTTON, lambda event: self.OnParseButton(event, edit_mode))
+        self.Bind(wx.EVT_BUTTON, self.OnAboutBox, self.menu.aboutButton)
 
         '''
         dlg = wx.FileDialog(self.viewFrame, wildcard=r"*.pdf")
@@ -159,18 +167,44 @@ class FullFrame(wx.Frame):
             self.window.ShutdownDemo()
         evt.Skip()
 
-    def OnSwitchPanels(self, event):
-        if self.viewPanel.IsShown():
-            self.viewPanel.Hide()
-            self.menu.Show()
-        else:
-            self.viewPanel.Show()
-            self.menu.Hide()
+    def OnAboutBox(self, event):
+        description = """
+        The Engineering Drawing Parser is a cross-platform tool
+        used to interpret bubbled engineering drawings and specifications,
+        as well as create bubbled drawings. Features include automatic
+        recognition of dimensions, auto-bubbling and exporting .csv data.
+        """
+        licence = """
+        The Engineering Drawing Parser is free software; you can redistribute
+        it and/or modify it under the terms of the GNU General Public License as
+        published by the Free Software Foundation.
+        """
+        info = wx.adv.AboutDialogInfo()
+        info.SetIcon(wx.Icon('logo.png', wx.BITMAP_TYPE_PNG))
+        info.SetName('Engineering Drawing Parser')
+        info.SetVersion('1.0')
+        info.SetDescription(description)
+        info.SetWebSite('https://github.com/Benjamin-Hu/Engineering-Drawing-Parser')
+        info.SetLicence(licence)
+        info.AddDeveloper('Benjamin Hu')
+
+        wx.adv.AboutBox(info)
+
+    def OnMainMenu(self, event):
+        self.viewPanel.Hide()
+        self.menu.Show()
         self.Layout()
 
     def OnManualButton(self, event, edit):
         edit = True
-        self.viewPanel.vsizer.Add(self.viewPanel.addbutton, 0, wx.ALIGN_CENTER | wx.ALL, 5)
+        self.viewPanel.addbutton.Show()
+        self.viewPanel.Show()
+        self.menu.Hide()
+        self.Layout()
+
+    def OnParseButton(self, event, edit):
+        edit = False
+        self.viewPanel.addbutton.Hide()
         self.viewPanel.Show()
         self.menu.Hide()
         self.Layout()
