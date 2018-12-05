@@ -62,9 +62,6 @@ class viewerPanel(wx.Panel):
         self.vsizer.Add(self.viewer, 1, wx.GROW|wx.LEFT|wx.RIGHT|wx.BOTTOM, 5)
 
         # Adding relevant buttons (or none at all)
-        self.loadbutton = wx.Button(self, wx.ID_ANY, "Load PDF file", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.vsizer.Add(self.loadbutton, 0, wx.ALIGN_CENTER|wx.ALL, 5)
-
         self.addbutton = wx.Button(self, wx.ID_ANY, "Add Dimension", wx.DefaultPosition, wx.DefaultSize, 0)
         self.vsizer.Add(self.addbutton, 0, wx.ALIGN_CENTER | wx.ALL, 5)
         self.addbutton.Hide()
@@ -79,20 +76,11 @@ class viewerPanel(wx.Panel):
         self.viewer.buttonpanel = self.buttonpanel
 
         # Binding all of the buttons
-        self.Bind(wx.EVT_BUTTON, self.OnLoadButton, self.loadbutton)
         add_points = []
         self.addbutton.Bind(wx.EVT_BUTTON, lambda event: self.OnAddButton(event, add_points))
 
-    def OnLoadButton(self, event):
-        dlg = wx.FileDialog(self, wildcard=r"*.pdf")
-        if dlg.ShowModal() == wx.ID_OK:
-            wx.BeginBusyCursor()
-            self.viewer.LoadFile(dlg.GetPath())
-            wx.EndBusyCursor()
-        dlg.Destroy()
-
     def OnAddButton(self, event, add_list):
-        print("Debug: Adding values...")
+        print("Adding values...")
         print(self.viewer.Xpagepixels, self.viewer.Ypagepixels)
         self.viewer.Bind(wx.EVT_LEFT_DOWN, lambda event: self.AddLeftClick(event, add_list))
 
@@ -114,6 +102,9 @@ class FullFrame(wx.Frame):
         # Setting up the app
         wx.Frame.__init__(self, parent=None, title="Engineering Drawing Parser", size=(1024, 576))
         self.CenterOnScreen()
+        icon = wx.Icon()
+        icon.CopyFromBitmap(wx.Bitmap("icon.ico", wx.BITMAP_TYPE_ANY))
+        self.SetIcon(icon)
 
         # Creating a menu bar and proper window features
         self.CreateStatusBar()
@@ -141,19 +132,11 @@ class FullFrame(wx.Frame):
         self.SetSizer(self.sizer)
 
         # Binding relevant buttons from lower level panels
-        edit_mode = None
-        self.menu.manualButton.Bind(wx.EVT_BUTTON, lambda event: self.OnManualButton(event, edit_mode))
-        self.menu.parseButton.Bind(wx.EVT_BUTTON, lambda event: self.OnParseButton(event, edit_mode))
-        self.Bind(wx.EVT_BUTTON, self.OnAboutBox, self.menu.aboutButton)
+        self.fileName = None
 
-        '''
-        dlg = wx.FileDialog(self.viewFrame, wildcard=r"*.pdf")
-        if dlg.ShowModal() == wx.ID_OK:
-            wx.BeginBusyCursor()
-            upload_file = dlg.GetPath()
-            wx.EndBusyCursor()
-        dlg.Destroy()
-        '''
+        self.menu.manualButton.Bind(wx.EVT_BUTTON, lambda event: self.OnManualButton(event, self.fileName))
+        self.menu.parseButton.Bind(wx.EVT_BUTTON, lambda event: self.OnParseButton(event, self.fileName))
+        self.Bind(wx.EVT_BUTTON, self.OnAboutBox, self.menu.aboutButton)
 
         # Setting up the panel now that requested option is known
 
@@ -195,15 +178,33 @@ class FullFrame(wx.Frame):
         self.menu.Show()
         self.Layout()
 
-    def OnManualButton(self, event, edit):
-        edit = True
+    def OnManualButton(self, event, file):
+        file = None
+
+        dlg = wx.FileDialog(self.viewPanel, wildcard=r"*.pdf")
+        if dlg.ShowModal() == wx.ID_OK:
+            file = dlg.GetPath()
+        dlg.Destroy()
+        if file is None:
+            return
+
+        self.viewPanel.viewer.LoadFile(file)
         self.viewPanel.addbutton.Show()
         self.viewPanel.Show()
         self.menu.Hide()
         self.Layout()
 
-    def OnParseButton(self, event, edit):
-        edit = False
+    def OnParseButton(self, event, file):
+        file = None
+
+        dlg = wx.FileDialog(self.viewPanel, message="Select an Engineering Drawing", wildcard=r"*.pdf")
+        if dlg.ShowModal() == wx.ID_OK:
+            file = dlg.GetPath()
+        dlg.Destroy()
+        if file is None:
+            return
+
+        self.viewPanel.viewer.LoadFile(file)
         self.viewPanel.addbutton.Hide()
         self.viewPanel.Show()
         self.menu.Hide()
