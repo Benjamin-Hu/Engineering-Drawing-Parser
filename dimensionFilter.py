@@ -91,7 +91,7 @@ class Dimension:
             return -1                                                             # Return -1 for invalid dimension
 
 
-def file_input(p_file, dim_array=[], objects=[], mapped_matrix = []):
+def file_input(p_file, autoMode, dim_array=[], objects=[], mapped_matrix=[]):
     page_no = False
     coordinate = False
     next_copy = False
@@ -124,7 +124,7 @@ def file_input(p_file, dim_array=[], objects=[], mapped_matrix = []):
     copy_number = 1
     for dimension in dim_array[:]:
         number = dimension.validate_dimension()
-        if number > -1:
+        if number > -1 and autoMode:
             x = floor(float(dimension.x1)/BOX_UNIT)
             x_limit = floor(float(dimension.x2)/BOX_UNIT)
             y_limit = floor(float(dimension.y2)/BOX_UNIT)

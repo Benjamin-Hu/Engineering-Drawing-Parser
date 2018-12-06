@@ -34,7 +34,6 @@ def output_txt(file_path, save_file):
     interpreter = PDFPageInterpreter(rsrcmgr, device)
     page_number = 1
     for page in PDFPage.create_pages(doc):
-        print(page_number)
         interpreter.process_page(page)
         layout = device.get_result()
         parse_layout(page_number, layout, save_file)

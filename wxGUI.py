@@ -2,8 +2,11 @@
 
 import wx
 import sys
+import os
 from wx.lib.pdfviewer import pdfViewer, pdfButtonPanel
 import wx.adv
+import parserFunction
+import dimensionFilter
 
 # ----------------------------------------------------------------------
 
@@ -45,7 +48,7 @@ class menuPanel(wx.Panel):
 
 
 class viewerPanel(wx.Panel):
-    def __init__(self, parent, edit_mode):
+    def __init__(self, parent):
         # Setting up panel and sizers
         wx.Panel.__init__(self, parent, -1)
         self.hsizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -62,9 +65,22 @@ class viewerPanel(wx.Panel):
         self.vsizer.Add(self.viewer, 1, wx.GROW|wx.LEFT|wx.RIGHT|wx.BOTTOM, 5)
 
         # Adding relevant buttons (or none at all)
+        self.buttonSizerTop = wx.BoxSizer(wx.HORIZONTAL)
         self.addbutton = wx.Button(self, wx.ID_ANY, "Add Dimension", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.vsizer.Add(self.addbutton, 0, wx.ALIGN_CENTER | wx.ALL, 5)
-        self.addbutton.Hide()
+        self.buttonSizerTop.Add(self.addbutton, 0, wx.ALIGN_CENTER | wx.ALL, 5)
+        self.removebutton = wx.Button(self, wx.ID_ANY, "Remove Dimension", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.buttonSizerTop.Add(self.removebutton, 0, wx.ALIGN_CENTER | wx.ALL, 5)
+        self.refreshbutton = wx.Button(self, wx.ID_ANY, "Apply Changes", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.buttonSizerTop.Add(self.refreshbutton, 0, wx.ALL | wx.ALIGN_CENTER, 5)
+        self.vsizer.Add(self.buttonSizerTop, 0, wx.ALIGN_CENTER_HORIZONTAL, 5)
+
+        self.buttonSizerBottom = wx.BoxSizer(wx.HORIZONTAL)
+        self.backbutton = wx.Button(self, wx.ID_ANY, "Back", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.buttonSizerBottom.Add(self.backbutton, 0, wx.ALL | wx.ALIGN_LEFT, 5)
+        self.buttonSizerBottom.Add(2000,0,1) # Proportionate sizer that keeps two buttons apart
+        self.finishbutton = wx.Button(self, wx.ID_ANY, "Finish", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.buttonSizerBottom.Add(self.finishbutton, 0, wx.ALL | wx.ALIGN_RIGHT, 5)
+        self.vsizer.Add(self.buttonSizerBottom, 0, wx.ALIGN_CENTER_HORIZONTAL, 5)
 
         # Completing sizing setup
         self.hsizer.Add(self.vsizer, 1, wx.GROW|wx.ALIGN_CENTER_HORIZONTAL|wx.ALL, 5)
@@ -102,6 +118,22 @@ class FullFrame(wx.Frame):
         # Setting up the app
         wx.Frame.__init__(self, parent=None, title="Engineering Drawing Parser", size=(1024, 576))
         self.CenterOnScreen()
+
+        # Establishing files
+        self.created_file = open('parsedPDF.txt', "w+", encoding="utf-8-sig")
+        self.created_file.truncate(0)
+        self.csv_text = open('Inspection Standard CSV.txt', 'w')
+        self.csv_text_path = os.path.abspath('Inspection Standard CSV.txt')
+        self.bubbled_pdf = open('Result.pdf', "wb")
+        self.bubbled_pdf_path = os.path.abspath("Result.pdf")
+
+        # Establishing parameters
+        self.validatedDimensions = []  # List of final dimensions
+        self.possibleDimensions = []  # List of possible dimensions
+        self.lineObjects = []  # List of other misc objects
+        self.coordinateArray = None # Mapped array of dimension locations (only needed in autoMode)
+
+        # Setting up program icon
         icon = wx.Icon()
         icon.CopyFromBitmap(wx.Bitmap("icon.ico", wx.BITMAP_TYPE_ANY))
         self.SetIcon(icon)
@@ -123,7 +155,7 @@ class FullFrame(wx.Frame):
 
         # Setting up main menu and viewer panels
         self.menu = menuPanel(self)
-        self.viewPanel = viewerPanel(self, None)
+        self.viewPanel = viewerPanel(self)
         self.viewPanel.Hide()
 
         self.sizer = wx.BoxSizer(wx.VERTICAL)
@@ -134,6 +166,7 @@ class FullFrame(wx.Frame):
         # Binding relevant buttons from lower level panels
         self.fileName = None
 
+        self.Bind(wx.EVT_BUTTON, self.OnMainMenu, self.viewPanel.backbutton)
         self.menu.manualButton.Bind(wx.EVT_BUTTON, lambda event: self.OnManualButton(event, self.fileName))
         self.menu.parseButton.Bind(wx.EVT_BUTTON, lambda event: self.OnParseButton(event, self.fileName))
         self.Bind(wx.EVT_BUTTON, self.OnAboutBox, self.menu.aboutButton)
@@ -190,9 +223,14 @@ class FullFrame(wx.Frame):
 
         self.viewPanel.viewer.LoadFile(file)
         self.viewPanel.addbutton.Show()
+        self.viewPanel.removebutton.Show()
         self.viewPanel.Show()
         self.menu.Hide()
         self.Layout()
+
+        parserFunction.output_txt(file, self.created_file)
+        self.created_file.seek(0)
+        dimensionFilter.file_input(self.created_file, False, self.possibleDimensions, self.lineObjects, self.coordinateArray)
 
     def OnParseButton(self, event, file):
         file = None
@@ -206,6 +244,7 @@ class FullFrame(wx.Frame):
 
         self.viewPanel.viewer.LoadFile(file)
         self.viewPanel.addbutton.Hide()
+        self.viewPanel.removebutton.Hide()
         self.viewPanel.Show()
         self.menu.Hide()
         self.Layout()
