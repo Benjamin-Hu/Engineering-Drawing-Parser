@@ -91,25 +91,6 @@ class viewerPanel(wx.Panel):
         self.buttonpanel.viewer = self.viewer
         self.viewer.buttonpanel = self.buttonpanel
 
-        # Binding all of the buttons
-        add_points = []
-        self.addbutton.Bind(wx.EVT_BUTTON, lambda event: self.OnAddButton(event, add_points))
-
-    def OnAddButton(self, event, add_list):
-        print("Adding values...")
-        print(self.viewer.Xpagepixels, self.viewer.Ypagepixels)
-        self.viewer.Bind(wx.EVT_LEFT_DOWN, lambda event: self.AddLeftClick(event, add_list))
-
-    # Able to take any relevant lists
-    def AddLeftClick(self, event, point_list):
-        panel_point = self.viewer.ScreenToClient(wx.GetMousePosition())
-        pointwx = wx.Point(0,0)
-        scrolled = self.viewer.CalcUnscrolledPosition(pointwx)
-        scrolled.__iadd__(panel_point)
-        if scrolled.x < self.viewer.Xpagepixels and scrolled.y < self.viewer.Ypagepixels*self.viewer.numpages:
-            print(scrolled)
-            point_list.append(scrolled)
-
 # ----------------------------------------------------------------------
 
 
@@ -170,8 +151,8 @@ class FullFrame(wx.Frame):
         self.menu.manualButton.Bind(wx.EVT_BUTTON, lambda event: self.OnManualButton(event, self.fileName))
         self.menu.parseButton.Bind(wx.EVT_BUTTON, lambda event: self.OnParseButton(event, self.fileName))
         self.Bind(wx.EVT_BUTTON, self.OnAboutBox, self.menu.aboutButton)
-
-        # Setting up the panel now that requested option is known
+        self.addPoints = []
+        self.viewPanel.addbutton.Bind(wx.EVT_BUTTON, lambda event: self.OnAddButton(event, self.addPoints))
 
 
 
@@ -228,6 +209,7 @@ class FullFrame(wx.Frame):
         self.menu.Hide()
         self.Layout()
 
+        # Perform backend operations
         parserFunction.output_txt(file, self.created_file)
         self.created_file.seek(0)
         dimensionFilter.file_input(self.created_file, False, self.possibleDimensions, self.lineObjects, self.coordinateArray)
@@ -248,6 +230,20 @@ class FullFrame(wx.Frame):
         self.viewPanel.Show()
         self.menu.Hide()
         self.Layout()
+
+    def OnAddButton(self, event, add_list):
+            print("Adding values...")
+            print(self.viewPanel.viewer.Xpagepixels, self.viewPanel.viewer.Ypagepixels)
+            self.viewPanel.viewer.Bind(wx.EVT_LEFT_DOWN, lambda event: self.AddLeftClick(event, add_list))
+
+    def AddLeftClick(self, event, point_list):
+        panel_point = self.viewPanel.viewer.ScreenToClient(wx.GetMousePosition())
+        pointwx = wx.Point(0, 0)
+        scrolled = self.viewPanel.viewer.CalcUnscrolledPosition(pointwx)
+        scrolled.__iadd__(panel_point)
+        if scrolled.x < self.viewPanel.viewer.Xpagepixels and scrolled.y < self.viewPanel.viewer.Ypagepixels*self.viewPanel.viewer.numpages:
+            print(scrolled)
+            point_list.append(scrolled)
 
 # ----------------------------------------------------------------------
 
