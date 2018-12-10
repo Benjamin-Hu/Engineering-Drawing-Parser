@@ -1,33 +1,37 @@
 import re
 from draw import BOX_UNIT
 from math import floor
+from wx import Point
 
 ONE_DECIMAL_TOL = 0.5
 TWO_DECIMAL_TOL = 0.15
 THREE_DECIMAL_TOL = 0.05
 LTCURVE_LIMIT = 400
 
+
 class Dimension:
-    def __init__(self, figure_type, page, string, label, x1, y1, x2, y2, nom, tol, copy=1):
+    def __init__(self, figure_type, page, string, label, x1, y1, x2, y2, labX, labY, nom, tol, copy=1):
         self.type = figure_type
         self.page_number = page
         self.string = string
         self.label = label
-        self.x1 = x1
-        self.y1 = y1
-        self.x2 = x2
-        self.y2 = y2
+        self.left = x1
+        self.top = y1
+        self.right = x2
+        self.bottom = y2
+        self.label_x = labX
+        self.label_y = labY
         self.nominal = nom
         self.tolerance = tol
         self.copies = copy
 
     @classmethod
     def file_input(cls, figure_type):
-        return cls(figure_type, 0, "", "", 0, 0, 0, 0, "", "", 1)
+        return cls(figure_type, 0, "", "", 0, 0, 0, 0, 0, 0, "", "", 1)
 
     @classmethod
     def copy_dim(cls, dim):
-        return cls(dim.type, dim.page_number, "", "", dim.x1, str(float(dim.y1)-BOX_UNIT), dim.x2, str(float(dim.y2)-BOX_UNIT), "", "", 1)
+        return cls(dim.type, dim.page_number, "", "", dim.left, str(float(dim.top)-BOX_UNIT), dim.right, str(float(dim.bottom)-BOX_UNIT), 0, 0, "", "", 1)
 
     def string_parser(self):
         if "±" in self.string:
@@ -85,7 +89,7 @@ class Dimension:
                     return 0
             else:
                 return 0
-        elif self.type == "LTLine" or self.type == "LTFigure" or (abs(float(self.y1) - float(self.y2)) < LTCURVE_LIMIT and abs(float(self.x1) - float(self.x2)) < LTCURVE_LIMIT) :
+        elif self.type == "LTLine" or self.type == "LTFigure" or (abs(float(self.top) - float(self.bottom)) < LTCURVE_LIMIT and abs(float(self.left) - float(self.right)) < LTCURVE_LIMIT) :
             return 0
         else:
             return -1                                                             # Return -1 for invalid dimension
@@ -105,7 +109,7 @@ def file_input(p_file, autoMode, dim_array=[], objects=[], mapped_matrix=[]):
         elif coordinate:
             coordinate = False
             line = line.strip("( )")
-            dim_array[-1].x1, dim_array[-1].y1, dim_array[-1].x2, dim_array[-1].y2 = line.split(",")
+            dim_array[-1].left, dim_array[-1].top, dim_array[-1].right, dim_array[-1].bottom = line.split(",")
         elif "LTText" in line or "LTLine" in line or "LTFigure" in line or "LTCurve" in line:
             dim = Dimension.file_input(line)
             dim_array.append(dim)
@@ -125,11 +129,11 @@ def file_input(p_file, autoMode, dim_array=[], objects=[], mapped_matrix=[]):
     for dimension in dim_array[:]:
         number = dimension.validate_dimension()
         if number > -1 and autoMode:
-            x = floor(float(dimension.x1)/BOX_UNIT)
-            x_limit = floor(float(dimension.x2)/BOX_UNIT)
-            y_limit = floor(float(dimension.y2)/BOX_UNIT)
+            x = floor(float(dimension.left)/BOX_UNIT)
+            x_limit = floor(float(dimension.right)/BOX_UNIT)
+            y_limit = floor(float(dimension.bottom)/BOX_UNIT)
             while x <= x_limit:
-                y = floor(float(dimension.y1)/BOX_UNIT)
+                y = floor(float(dimension.top)/BOX_UNIT)
                 while y <= y_limit:
                     try:
                         mapped_matrix[x][y] = True

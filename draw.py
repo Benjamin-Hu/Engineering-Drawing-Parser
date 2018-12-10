@@ -4,10 +4,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.platypus import Table, TableStyle
 from reportlab.pdfgen import canvas
 from PyPDF2 import PdfFileWriter, PdfFileReader
-import re
 import io
-import math
-from math import floor
 
 BOX_UNIT = 12
 
@@ -81,7 +78,7 @@ def empty_space(array, figure, dim_x, dim_y, bubble_width, bubble_height):
         return dim_x, dim_y
 
 
-def print_dims(dim_array, pdf_file, csv, outputStream, mapped_matrix):
+def print_dims(dim_array, pdf_file, csv, outputStream):
     counter = 1
     max_page = 0
     packet = io.BytesIO()
@@ -89,29 +86,18 @@ def print_dims(dim_array, pdf_file, csv, outputStream, mapped_matrix):
     last_page = 0
     # create a new PDF with Reportlab
     c = canvas.Canvas(packet, pagesize=letter)
-    '''
-    for x in range(int(1250/BOX_UNIT)):
-        for y in range(int(850/BOX_UNIT)):
-            if mapped_matrix[x][y] == False:
-                pdf_label(" ", c, BOX_UNIT, BOX_UNIT, x*BOX_UNIT, y * BOX_UNIT, width, height)
-    '''
+
     for dimension1 in dim_array:
-        x = (float(dimension1.x2) + float(dimension1.x1))/2
-        y = (float(dimension1.y2) + float(dimension1.y1))/2
         if dimension1.page_number != last_page and last_page != 0:
             c.showPage()
         if dimension1.copies == 1:
             dimension1.label = str(counter)
-            bubble_x, bubble_y = empty_space(mapped_matrix,"LTTextBoxHorizontal", floor(x/BOX_UNIT), floor(y/BOX_UNIT), 1, 1)
-            pdf_label(dimension1.label, c, BOX_UNIT, BOX_UNIT, bubble_x*BOX_UNIT, bubble_y*BOX_UNIT, width, height)
-            print(bubble_x * BOX_UNIT, bubble_y * BOX_UNIT)
+            pdf_label(dimension1.label, c, BOX_UNIT, BOX_UNIT, dimension1.label_x, dimension1.label_y, width, height)
             csv.write(str(dimension1.label) + "," + str(dimension1.nominal) + "," + str(dimension1.tolerance))
             csv.write("\n")
         elif dimension1.copies > 1:
             duplicate = 0
-            bubble_x, bubble_y = empty_space(mapped_matrix, "LTTextBoxHorizontal", floor(x/BOX_UNIT), floor(y/BOX_UNIT), 3, 1)
-            pdf_label(str(counter) + "A-" + ascii_uppercase[dimension1.copies-1], c, BOX_UNIT*3, BOX_UNIT, bubble_x*BOX_UNIT, bubble_y*BOX_UNIT, width, height)
-            print(bubble_x * BOX_UNIT, bubble_y * BOX_UNIT)
+            pdf_label(str(counter) + "A-" + ascii_uppercase[dimension1.copies-1], c, BOX_UNIT*3, BOX_UNIT, dimension1.label_x, dimension1.label_y, width, height)
             while duplicate < dimension1.copies:
                 dimension1.label = str(counter) + ascii_uppercase[duplicate]
                 csv.write(str(dimension1.label) + "," + str(dimension1.nominal) + "," + str(dimension1.tolerance))

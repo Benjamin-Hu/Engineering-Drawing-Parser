@@ -1,4 +1,6 @@
 # run.py forked from wxPython
+# Assuming a 11" x 17" page
+# 792 x 1224 in PDF coordinates
 
 import wx
 import sys
@@ -7,6 +9,7 @@ from wx.lib.pdfviewer import pdfViewer, pdfButtonPanel
 import wx.adv
 import parserFunction
 import dimensionFilter
+import draw
 
 # ----------------------------------------------------------------------
 
@@ -70,6 +73,8 @@ class viewerPanel(wx.Panel):
         self.buttonSizerTop.Add(self.addbutton, 0, wx.ALIGN_CENTER | wx.ALL, 5)
         self.removebutton = wx.Button(self, wx.ID_ANY, "Remove Dimension", wx.DefaultPosition, wx.DefaultSize, 0)
         self.buttonSizerTop.Add(self.removebutton, 0, wx.ALIGN_CENTER | wx.ALL, 5)
+        self.movebutton = wx.Button(self, wx.ID_ANY, "Move Dimension", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.buttonSizerTop.Add(self.movebutton, 0, wx.ALL | wx.ALIGN_CENTER, 5)
         self.refreshbutton = wx.Button(self, wx.ID_ANY, "Apply Changes", wx.DefaultPosition, wx.DefaultSize, 0)
         self.buttonSizerTop.Add(self.refreshbutton, 0, wx.ALL | wx.ALIGN_CENTER, 5)
         self.vsizer.Add(self.buttonSizerTop, 0, wx.ALIGN_CENTER_HORIZONTAL, 5)
@@ -112,7 +117,7 @@ class FullFrame(wx.Frame):
         self.validatedDimensions = []  # List of final dimensions
         self.possibleDimensions = []  # List of possible dimensions
         self.lineObjects = []  # List of other misc objects
-        self.coordinateArray = None # Mapped array of dimension locations (only needed in autoMode)
+        self.coordinateArray = None  # Mapped array of dimension locations (only needed in autoMode)
 
         # Setting up program icon
         icon = wx.Icon()
@@ -130,7 +135,7 @@ class FullFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self.OnAboutBox, aboutMe)
         mainMenu = menuOption.Append(wx.ID_ANY, "&Main Menu\tEsc")
         self.Bind(wx.EVT_MENU, self.OnMainMenu, mainMenu)
-        exit = menuOption.Append(wx.ID_EXIT, "Exit\tCtrl+Q", "Exit Program")
+        exit = menuOption.Append(wx.ID_EXIT, "Exit\tAlt+F4", "Exit Program")
         self.Bind(wx.EVT_MENU, self.OnExitApp, exit)
         self.Bind(wx.EVT_CLOSE, self.OnCloseFrame)
 
@@ -146,14 +151,15 @@ class FullFrame(wx.Frame):
 
         # Binding relevant buttons from lower level panels
         self.fileName = None
+        self.filePath = None
 
         self.Bind(wx.EVT_BUTTON, self.OnMainMenu, self.viewPanel.backbutton)
-        self.menu.manualButton.Bind(wx.EVT_BUTTON, lambda event: self.OnManualButton(event, self.fileName))
-        self.menu.parseButton.Bind(wx.EVT_BUTTON, lambda event: self.OnParseButton(event, self.fileName))
+        self.Bind(wx.EVT_BUTTON, self.OnManualButton, self.menu.manualButton)
+        self.Bind(wx.EVT_BUTTON, self.OnParseButton, self.menu.parseButton)
         self.Bind(wx.EVT_BUTTON, self.OnAboutBox, self.menu.aboutButton)
         self.addPoints = []
-        self.viewPanel.addbutton.Bind(wx.EVT_BUTTON, lambda event: self.OnAddButton(event, self.addPoints))
-
+        self.Bind(wx.EVT_BUTTON, self.OnAddButton, self.viewPanel.addbutton)
+        self.Bind(wx.EVT_BUTTON, self.OnApplyChanges, self.viewPanel.refreshbutton)
 
 
     def OnExitApp(self, evt):
@@ -192,58 +198,76 @@ class FullFrame(wx.Frame):
         self.menu.Show()
         self.Layout()
 
-    def OnManualButton(self, event, file):
-        file = None
+    def OnManualButton(self, event):
+        self.fileName = None
+        self.filePath = None
 
-        dlg = wx.FileDialog(self.viewPanel, wildcard=r"*.pdf")
+        dlg = wx.FileDialog(self.viewPanel, message="Select an Engineering Drawing", wildcard=r"*.pdf")
         if dlg.ShowModal() == wx.ID_OK:
-            file = dlg.GetPath()
+            self.filePath = dlg.GetPath()
         dlg.Destroy()
-        if file is None:
+        if self.filePath is None:
             return
 
-        self.viewPanel.viewer.LoadFile(file)
+        self.fileName = open(self.filePath, 'rb')
+        self.viewPanel.viewer.LoadFile(self.filePath)
         self.viewPanel.addbutton.Show()
         self.viewPanel.removebutton.Show()
+        self.viewPanel.movebutton.Show()
+        self.viewPanel.refreshbutton.Show()
         self.viewPanel.Show()
         self.menu.Hide()
         self.Layout()
 
         # Perform backend operations
-        parserFunction.output_txt(file, self.created_file)
+        parserFunction.output_txt(self.filePath, self.created_file)
         self.created_file.seek(0)
         dimensionFilter.file_input(self.created_file, False, self.possibleDimensions, self.lineObjects, self.coordinateArray)
 
     def OnParseButton(self, event, file):
-        file = None
+        self.fileName = None
+        self.filePath = None
 
         dlg = wx.FileDialog(self.viewPanel, message="Select an Engineering Drawing", wildcard=r"*.pdf")
         if dlg.ShowModal() == wx.ID_OK:
-            file = dlg.GetPath()
+            self.filePath = dlg.GetPath()
         dlg.Destroy()
-        if file is None:
+        if self.filePath is None:
             return
 
-        self.viewPanel.viewer.LoadFile(file)
+        self.fileName = open(self.filePath, 'rb')
+
+        self.viewPanel.viewer.LoadFile(self.filePath)
         self.viewPanel.addbutton.Hide()
         self.viewPanel.removebutton.Hide()
+        self.viewPanel.movebutton.Hide()
+        self.viewPanel.refreshbutton.Hide()
         self.viewPanel.Show()
         self.menu.Hide()
         self.Layout()
 
-    def OnAddButton(self, event, add_list):
-            print("Adding values...")
-            print(self.viewPanel.viewer.Xpagepixels, self.viewPanel.viewer.Ypagepixels)
-            self.viewPanel.viewer.Bind(wx.EVT_LEFT_DOWN, lambda event: self.AddLeftClick(event, add_list))
+    def OnApplyChanges(self, event):
+        # function for addPoints
+        draw.print_dims(self.validatedDimensions, self.fileName, self.csv_text, self.bubbled_pdf)
+        self.viewPanel.viewer.LoadFile(self.bubbled_pdf)
 
-    def AddLeftClick(self, event, point_list):
+    def OnAddButton(self, event):
+        print("Adding values...")
+        print(self.viewPanel.viewer.Xpagepixels, self.viewPanel.viewer.Ypagepixels)
+        self.viewPanel.viewer.Bind(wx.EVT_LEFT_DOWN, self.AddLeftClick)
+        self.viewPanel.viewer.Bind(wx.EVT_RIGHT_DOWN, self.AddRightClick)
+
+    def AddLeftClick(self, event):
         panel_point = self.viewPanel.viewer.ScreenToClient(wx.GetMousePosition())
         pointwx = wx.Point(0, 0)
         scrolled = self.viewPanel.viewer.CalcUnscrolledPosition(pointwx)
         scrolled.__iadd__(panel_point)
         if scrolled.x < self.viewPanel.viewer.Xpagepixels and scrolled.y < self.viewPanel.viewer.Ypagepixels*self.viewPanel.viewer.numpages:
             print(scrolled)
-            point_list.append(scrolled)
+            self.addPoints.append(scrolled)
+
+    def AddRightClick(self, event):
+        self.viewPanel.viewer.Unbind(wx.EVT_LEFT_DOWN)
 
 # ----------------------------------------------------------------------
 
