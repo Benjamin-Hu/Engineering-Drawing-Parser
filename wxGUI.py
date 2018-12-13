@@ -10,6 +10,7 @@ import wx.adv
 import parserFunction
 import dimensionFilter
 import draw
+import math
 
 # ----------------------------------------------------------------------
 
@@ -110,7 +111,7 @@ class FullFrame(wx.Frame):
         self.created_file.truncate(0)
         self.csv_text = open('Inspection Standard CSV.txt', 'w')
         self.csv_text_path = os.path.abspath('Inspection Standard CSV.txt')
-        self.bubbled_pdf = open('Result.pdf', "wb")
+        self.bubbled_pdf = None
         self.bubbled_pdf_path = os.path.abspath("Result.pdf")
 
         # Establishing parameters
@@ -159,7 +160,10 @@ class FullFrame(wx.Frame):
         self.Bind(wx.EVT_BUTTON, self.OnAboutBox, self.menu.aboutButton)
         self.addPoints = []
         self.Bind(wx.EVT_BUTTON, self.OnAddButton, self.viewPanel.addbutton)
+        self.Bind(wx.EVT_BUTTON, self.OnRemoveButton, self.viewPanel.removebutton)
+        self.Bind(wx.EVT_BUTTON, self.OnMoveButton, self.viewPanel.movebutton)
         self.Bind(wx.EVT_BUTTON, self.OnApplyChanges, self.viewPanel.refreshbutton)
+
 
 
     def OnExitApp(self, evt):
@@ -194,6 +198,10 @@ class FullFrame(wx.Frame):
         wx.adv.AboutBox(info)
 
     def OnMainMenu(self, event):
+        self.validatedDimensions = []  # List of final dimensions
+        self.possibleDimensions = []  # List of possible dimensions
+        self.lineObjects = []  # List of other misc objects
+        self.coordinateArray = None  # Mapped array of dimension locations (only needed in autoMode)
         self.viewPanel.Hide()
         self.menu.Show()
         self.Layout()
@@ -247,27 +255,102 @@ class FullFrame(wx.Frame):
         self.Layout()
 
     def OnApplyChanges(self, event):
-        # function for addPoints
+        self.bubbled_pdf = open('Result.pdf', "wb")
+        self.AddPointsApplier()
         draw.print_dims(self.validatedDimensions, self.fileName, self.csv_text, self.bubbled_pdf)
-        self.viewPanel.viewer.LoadFile(self.bubbled_pdf)
+        self.bubbled_pdf.close()
+        self.viewPanel.viewer.LoadFile(self.bubbled_pdf_path)
 
     def OnAddButton(self, event):
         print("Adding values...")
         print(self.viewPanel.viewer.Xpagepixels, self.viewPanel.viewer.Ypagepixels)
+        self.viewPanel.viewer.Unbind(wx.EVT_LEFT_DOWN)
         self.viewPanel.viewer.Bind(wx.EVT_LEFT_DOWN, self.AddLeftClick)
         self.viewPanel.viewer.Bind(wx.EVT_RIGHT_DOWN, self.AddRightClick)
 
+    def OnRemoveButton(self, event):
+        removedIndex = None
+        dlg = wx.TextEntryDialog(frame, 'Enter the numbered dimension you wish to remove:', 'Remove Dimensions')
+        if dlg.ShowModal() == wx.ID_OK:
+            removedIndex = int(dlg.GetValue())
+        dlg.Destroy()
+        try:
+            self.validatedDimensions.pop(removedIndex - 1)
+            self.bubbled_pdf = open('Result.pdf', "wb")
+            draw.print_dims(self.validatedDimensions, self.fileName, self.csv_text, self.bubbled_pdf)
+            self.bubbled_pdf.close()
+            self.viewPanel.viewer.LoadFile(self.bubbled_pdf_path)
+        except:
+            return
+
+    def OnMoveButton(self, event):
+        removedIndex = None
+        dlg = wx.TextEntryDialog(frame, 'Enter the numbered dimension you wish to move:', 'Move Dimensions')
+        if dlg.ShowModal() == wx.ID_OK:
+            removedIndex = int(dlg.GetValue())
+        dlg.Destroy()
+        self.viewPanel.viewer.Unbind(wx.EVT_LEFT_DOWN)
+        self.viewPanel.viewer.Bind(wx.EVT_LEFT_DOWN, lambda event: self.MoveLeftClick(event, removedIndex))
+
     def AddLeftClick(self, event):
         panel_point = self.viewPanel.viewer.ScreenToClient(wx.GetMousePosition())
-        pointwx = wx.Point(0, 0)
-        scrolled = self.viewPanel.viewer.CalcUnscrolledPosition(pointwx)
+        scrolled = self.viewPanel.viewer.CalcUnscrolledPosition(wx.Point(0, 0))
         scrolled.__iadd__(panel_point)
+        scrolled = wx.RealPoint(scrolled)
         if scrolled.x < self.viewPanel.viewer.Xpagepixels and scrolled.y < self.viewPanel.viewer.Ypagepixels*self.viewPanel.viewer.numpages:
+            scrolled.x = scrolled.x/self.viewPanel.viewer.Xpagepixels
+            scrolled.y = scrolled.y/self.viewPanel.viewer.Ypagepixels
             print(scrolled)
             self.addPoints.append(scrolled)
 
     def AddRightClick(self, event):
         self.viewPanel.viewer.Unbind(wx.EVT_LEFT_DOWN)
+
+    def AddPointsApplier(self):
+        for point in self.addPoints:
+            x = point.x*1224
+            y = 792 - point.y*792
+            print(x,y)
+            minDistance = sys.maxsize
+            selectedDimension = 0
+            currentIndex = 0
+            for dimension in self.possibleDimensions:
+                dist1 = math.hypot(x - float(dimension.left), y - float(dimension.top))
+                dist2 = math.hypot(x - float(dimension.left), y - float(dimension.bottom))
+                dist3 = math.hypot(x - float(dimension.right), y - float(dimension.top))
+                dist4 = math.hypot(x - float(dimension.right), y - float(dimension.bottom))
+                closestDist = min(dist1, dist2, dist3, dist4)
+                print(dimension.nominal, closestDist)
+                if minDistance > closestDist:
+                    minDistance = closestDist
+                    selectedDimension = currentIndex
+                currentIndex += 1
+            print("Min: ", minDistance)
+            self.possibleDimensions[selectedDimension].label_x = x - draw.BOX_UNIT/2
+            self.possibleDimensions[selectedDimension].label_y = y - draw.BOX_UNIT/2
+            self.validatedDimensions.append(self.possibleDimensions[selectedDimension])
+            self.possibleDimensions.pop(selectedDimension)
+        self.addPoints.clear()
+
+    def MoveLeftClick(self, event, index):
+        panel_point = self.viewPanel.viewer.ScreenToClient(wx.GetMousePosition())
+        scrolled = self.viewPanel.viewer.CalcUnscrolledPosition(wx.Point(0, 0))
+        scrolled.__iadd__(panel_point)
+        scrolled = wx.RealPoint(scrolled)
+        if scrolled.x < self.viewPanel.viewer.Xpagepixels and scrolled.y < self.viewPanel.viewer.Ypagepixels*self.viewPanel.viewer.numpages:
+            scrolled.x = scrolled.x/self.viewPanel.viewer.Xpagepixels
+            scrolled.y = scrolled.y/self.viewPanel.viewer.Ypagepixels
+            print(scrolled)
+        try:
+            self.validatedDimensions[index - 1].label_x = scrolled.x*1224
+            self.validatedDimensions[index - 1].label_y = 792 - scrolled.y*792
+            self.bubbled_pdf = open('Result.pdf', "wb")
+            draw.print_dims(self.validatedDimensions, self.fileName, self.csv_text, self.bubbled_pdf)
+            self.bubbled_pdf.close()
+            self.viewPanel.viewer.LoadFile(self.bubbled_pdf_path)
+        except:
+            return
+
 
 # ----------------------------------------------------------------------
 

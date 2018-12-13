@@ -6,7 +6,7 @@ from reportlab.pdfgen import canvas
 from PyPDF2 import PdfFileWriter, PdfFileReader
 import io
 
-BOX_UNIT = 12
+BOX_UNIT = 20
 
 
 def pdf_label(string, file, text_width, text_height, x, y, page_width, page_height):
@@ -97,7 +97,7 @@ def print_dims(dim_array, pdf_file, csv, outputStream):
             csv.write("\n")
         elif dimension1.copies > 1:
             duplicate = 0
-            pdf_label(str(counter) + "A-" + ascii_uppercase[dimension1.copies-1], c, BOX_UNIT*3, BOX_UNIT, dimension1.label_x, dimension1.label_y, width, height)
+            pdf_label(str(counter) + "A-" + ascii_uppercase[dimension1.copies-1], c, BOX_UNIT*3, BOX_UNIT, dimension1.label_x - BOX_UNIT*1.5, dimension1.label_y, width, height)
             while duplicate < dimension1.copies:
                 dimension1.label = str(counter) + ascii_uppercase[duplicate]
                 csv.write(str(dimension1.label) + "," + str(dimension1.nominal) + "," + str(dimension1.tolerance))
