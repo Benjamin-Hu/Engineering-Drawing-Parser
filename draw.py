@@ -80,16 +80,16 @@ def empty_space(array, figure, dim_x, dim_y, bubble_width, bubble_height):
 
 def print_dims(dim_array, pdf_file, csv, outputStream):
     counter = 1
-    max_page = 0
     packet = io.BytesIO()
     width, height = letter
-    last_page = 0
+    last_page = 1
     # create a new PDF with Reportlab
     c = canvas.Canvas(packet, pagesize=letter)
 
     for dimension1 in dim_array:
-        if dimension1.page_number != last_page and last_page != 0:
-            c.showPage()
+        while dimension1.page_number > last_page:
+            c.showPage()  # Ends current page and starts a new one
+            last_page += 1
         if dimension1.copies == 1:
             dimension1.label = str(counter)
             pdf_label(dimension1.label, c, BOX_UNIT, BOX_UNIT, dimension1.label_x, dimension1.label_y, width, height)
@@ -105,21 +105,22 @@ def print_dims(dim_array, pdf_file, csv, outputStream):
                 duplicate += 1
         counter += 1
         last_page = dimension1.page_number
-        if dimension1.page_number > max_page:
-            max_page = dimension1.page_number
     c.save()
     # move to the beginning of the StringIO buffer
     packet.seek(0)
     new_pdf = PdfFileReader(packet)
     # read your existing PDF
     existing_pdf = PdfFileReader(pdf_file)
+    max_page = existing_pdf.getNumPages()
     output = PdfFileWriter()
     page_no = 0
-    print(max_page)
     while page_no < max_page:
         # add the "watermark" (which is the new pdf) on the existing page
         page = existing_pdf.getPage(page_no)
-        page.mergePage(new_pdf.getPage(page_no))
+        try:
+            page.mergePage(new_pdf.getPage(page_no))
+        except:
+            print("No further dimensions found")
         output.addPage(page)
         page_no += 1
     # finally, write "output" to a real file

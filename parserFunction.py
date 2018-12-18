@@ -12,7 +12,7 @@ def parse_layout(page, layout, output):
     for lt_obj in layout:
         output.write(lt_obj.__class__.__name__)  # Print obj name
         output.write("\n")                       # Print new line
-        output.write(str(page))
+        output.write(str(page))                  # Print page number
         output.write("\n")
         output.write(str(lt_obj.bbox))           # Print box coords
         output.write("\n")                       # Print new line

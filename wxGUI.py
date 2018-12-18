@@ -12,6 +12,13 @@ import dimensionFilter
 import draw
 import math
 
+
+class Point:
+    def __init__(self, x, y, page=0):
+        self.x = x
+        self.y = y
+        self.page = page
+
 # ----------------------------------------------------------------------
 
 
@@ -155,6 +162,8 @@ class FullFrame(wx.Frame):
         self.filePath = None
 
         self.Bind(wx.EVT_BUTTON, self.OnMainMenu, self.viewPanel.backbutton)
+        self.Bind(wx.EVT_BUTTON, self.OnFinish, self.viewPanel.finishbutton)
+
         self.Bind(wx.EVT_BUTTON, self.OnManualButton, self.menu.manualButton)
         self.Bind(wx.EVT_BUTTON, self.OnParseButton, self.menu.parseButton)
         self.Bind(wx.EVT_BUTTON, self.OnAboutBox, self.menu.aboutButton)
@@ -202,9 +211,17 @@ class FullFrame(wx.Frame):
         self.possibleDimensions = []  # List of possible dimensions
         self.lineObjects = []  # List of other misc objects
         self.coordinateArray = None  # Mapped array of dimension locations (only needed in autoMode)
+        self.csv_text.truncate(0)
         self.viewPanel.Hide()
         self.menu.Show()
         self.Layout()
+
+    def OnFinish(self, event):
+        self.csv_text.close()
+        self.bubbled_pdf.close()
+        os.startfile(self.csv_text_path)
+        os.startfile(self.bubbled_pdf_path)
+        self.Close(True)
 
     def OnManualButton(self, event):
         self.fileName = None
@@ -257,6 +274,7 @@ class FullFrame(wx.Frame):
     def OnApplyChanges(self, event):
         self.bubbled_pdf = open('Result.pdf', "wb")
         self.AddPointsApplier()
+        self.validatedDimensions = sorted(self.validatedDimensions, key = lambda x: x.page_number)
         draw.print_dims(self.validatedDimensions, self.fileName, self.csv_text, self.bubbled_pdf)
         self.bubbled_pdf.close()
         self.viewPanel.viewer.LoadFile(self.bubbled_pdf_path)
@@ -298,36 +316,36 @@ class FullFrame(wx.Frame):
         scrolled.__iadd__(panel_point)
         scrolled = wx.RealPoint(scrolled)
         if scrolled.x < self.viewPanel.viewer.Xpagepixels and scrolled.y < self.viewPanel.viewer.Ypagepixels*self.viewPanel.viewer.numpages:
-            scrolled.x = scrolled.x/self.viewPanel.viewer.Xpagepixels
-            scrolled.y = scrolled.y/self.viewPanel.viewer.Ypagepixels
-            print(scrolled)
-            self.addPoints.append(scrolled)
+            page_num = math.floor(scrolled.y/self.viewPanel.viewer.Ypagepixels) + 1
+            scrolled.x = 1224*scrolled.x/self.viewPanel.viewer.Xpagepixels
+            scrolled.y = 792 - 792*(scrolled.y % self.viewPanel.viewer.Ypagepixels)/self.viewPanel.viewer.Ypagepixels
+            coordinate = Point(scrolled.x, scrolled.y, page_num)
+            print(coordinate.x, coordinate.y, coordinate.page)
+            self.addPoints.append(coordinate)
 
     def AddRightClick(self, event):
         self.viewPanel.viewer.Unbind(wx.EVT_LEFT_DOWN)
 
     def AddPointsApplier(self):
         for point in self.addPoints:
-            x = point.x*1224
-            y = 792 - point.y*792
-            print(x,y)
             minDistance = sys.maxsize
             selectedDimension = 0
             currentIndex = 0
             for dimension in self.possibleDimensions:
-                dist1 = math.hypot(x - float(dimension.left), y - float(dimension.top))
-                dist2 = math.hypot(x - float(dimension.left), y - float(dimension.bottom))
-                dist3 = math.hypot(x - float(dimension.right), y - float(dimension.top))
-                dist4 = math.hypot(x - float(dimension.right), y - float(dimension.bottom))
+                if point.page != dimension.page_number:
+                    currentIndex += 1
+                    continue
+                dist1 = math.hypot(point.x - float(dimension.left), point.y - float(dimension.top))
+                dist2 = math.hypot(point.x - float(dimension.left), point.y - float(dimension.bottom))
+                dist3 = math.hypot(point.x - float(dimension.right), point.y - float(dimension.top))
+                dist4 = math.hypot(point.x - float(dimension.right), point.y - float(dimension.bottom))
                 closestDist = min(dist1, dist2, dist3, dist4)
-                print(dimension.nominal, closestDist)
                 if minDistance > closestDist:
                     minDistance = closestDist
                     selectedDimension = currentIndex
                 currentIndex += 1
-            print("Min: ", minDistance)
-            self.possibleDimensions[selectedDimension].label_x = x - draw.BOX_UNIT/2
-            self.possibleDimensions[selectedDimension].label_y = y - draw.BOX_UNIT/2
+            self.possibleDimensions[selectedDimension].label_x = point.x - draw.BOX_UNIT/2
+            self.possibleDimensions[selectedDimension].label_y = point.y - draw.BOX_UNIT/2
             self.validatedDimensions.append(self.possibleDimensions[selectedDimension])
             self.possibleDimensions.pop(selectedDimension)
         self.addPoints.clear()
@@ -337,13 +355,15 @@ class FullFrame(wx.Frame):
         scrolled = self.viewPanel.viewer.CalcUnscrolledPosition(wx.Point(0, 0))
         scrolled.__iadd__(panel_point)
         scrolled = wx.RealPoint(scrolled)
-        if scrolled.x < self.viewPanel.viewer.Xpagepixels and scrolled.y < self.viewPanel.viewer.Ypagepixels*self.viewPanel.viewer.numpages:
-            scrolled.x = scrolled.x/self.viewPanel.viewer.Xpagepixels
-            scrolled.y = scrolled.y/self.viewPanel.viewer.Ypagepixels
-            print(scrolled)
+        if scrolled.x < self.viewPanel.viewer.Xpagepixels and scrolled.y < self.viewPanel.viewer.Ypagepixels * self.viewPanel.viewer.numpages:
+            scrolled.x = 1224 * scrolled.x / self.viewPanel.viewer.Xpagepixels
+            scrolled.y = 792 - 792 * (scrolled.y % self.viewPanel.viewer.Ypagepixels) / self.viewPanel.viewer.Ypagepixels
+            coordinate = Point(scrolled.x, scrolled.y)
+            print(coordinate.x, coordinate.y)
+            self.addPoints.append(coordinate)
         try:
-            self.validatedDimensions[index - 1].label_x = scrolled.x*1224
-            self.validatedDimensions[index - 1].label_y = 792 - scrolled.y*792
+            self.validatedDimensions[index - 1].label_x = coordinate.x
+            self.validatedDimensions[index - 1].label_y = coordinate.y
             self.bubbled_pdf = open('Result.pdf', "wb")
             draw.print_dims(self.validatedDimensions, self.fileName, self.csv_text, self.bubbled_pdf)
             self.bubbled_pdf.close()
