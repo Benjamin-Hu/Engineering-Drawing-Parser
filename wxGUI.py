@@ -1,6 +1,4 @@
 # run.py forked from wxPython
-# Assuming a 11" x 17" page
-# 792 x 1224 in PDF coordinates
 
 import wx
 import sys
@@ -126,6 +124,8 @@ class FullFrame(wx.Frame):
         self.possibleDimensions = []  # List of possible dimensions
         self.lineObjects = []  # List of other misc objects
         self.coordinateArray = None  # Mapped array of dimension locations (only needed in autoMode)
+        self.pageWidth = None
+        self.pageHeight = None
 
         # Setting up program icon
         icon = wx.Icon()
@@ -245,7 +245,7 @@ class FullFrame(wx.Frame):
         self.Layout()
 
         # Perform backend operations
-        parserFunction.output_txt(self.filePath, self.created_file)
+        self.pageWidth, self.pageHeight = parserFunction.output_txt(self.filePath, self.created_file)
         self.created_file.seek(0)
         dimensionFilter.file_input(self.created_file, False, self.possibleDimensions, self.lineObjects, self.coordinateArray)
 
@@ -275,6 +275,7 @@ class FullFrame(wx.Frame):
         self.bubbled_pdf = open('Result.pdf', "wb")
         self.AddPointsApplier()
         self.validatedDimensions = sorted(self.validatedDimensions, key = lambda x: x.page_number)
+        self.csv_text.truncate(0)
         draw.print_dims(self.validatedDimensions, self.fileName, self.csv_text, self.bubbled_pdf)
         self.bubbled_pdf.close()
         self.viewPanel.viewer.LoadFile(self.bubbled_pdf_path)
@@ -282,6 +283,9 @@ class FullFrame(wx.Frame):
     def OnAddButton(self, event):
         print("Adding values...")
         print(self.viewPanel.viewer.Xpagepixels, self.viewPanel.viewer.Ypagepixels)
+
+        wx.MessageBox("Please click the dimensions you wish to add and click Apply Changes.", "Attention", wx.OK, self)
+
         self.viewPanel.viewer.Unbind(wx.EVT_LEFT_DOWN)
         self.viewPanel.viewer.Bind(wx.EVT_LEFT_DOWN, self.AddLeftClick)
         self.viewPanel.viewer.Bind(wx.EVT_RIGHT_DOWN, self.AddRightClick)
@@ -307,6 +311,9 @@ class FullFrame(wx.Frame):
         if dlg.ShowModal() == wx.ID_OK:
             removedIndex = int(dlg.GetValue())
         dlg.Destroy()
+
+        wx.MessageBox("Please click at the new location of the bubble.", "Attention", wx.OK, self)
+
         self.viewPanel.viewer.Unbind(wx.EVT_LEFT_DOWN)
         self.viewPanel.viewer.Bind(wx.EVT_LEFT_DOWN, lambda event: self.MoveLeftClick(event, removedIndex))
 
@@ -317,8 +324,8 @@ class FullFrame(wx.Frame):
         scrolled = wx.RealPoint(scrolled)
         if scrolled.x < self.viewPanel.viewer.Xpagepixels and scrolled.y < self.viewPanel.viewer.Ypagepixels*self.viewPanel.viewer.numpages:
             page_num = math.floor(scrolled.y/self.viewPanel.viewer.Ypagepixels) + 1
-            scrolled.x = 1224*scrolled.x/self.viewPanel.viewer.Xpagepixels
-            scrolled.y = 792 - 792*(scrolled.y % self.viewPanel.viewer.Ypagepixels)/self.viewPanel.viewer.Ypagepixels
+            scrolled.x = self.pageWidth*scrolled.x/self.viewPanel.viewer.Xpagepixels
+            scrolled.y = self.pageHeight - self.pageHeight*(scrolled.y % self.viewPanel.viewer.Ypagepixels)/self.viewPanel.viewer.Ypagepixels
             coordinate = Point(scrolled.x, scrolled.y, page_num)
             print(coordinate.x, coordinate.y, coordinate.page)
             self.addPoints.append(coordinate)
@@ -356,14 +363,12 @@ class FullFrame(wx.Frame):
         scrolled.__iadd__(panel_point)
         scrolled = wx.RealPoint(scrolled)
         if scrolled.x < self.viewPanel.viewer.Xpagepixels and scrolled.y < self.viewPanel.viewer.Ypagepixels * self.viewPanel.viewer.numpages:
-            scrolled.x = 1224 * scrolled.x / self.viewPanel.viewer.Xpagepixels
-            scrolled.y = 792 - 792 * (scrolled.y % self.viewPanel.viewer.Ypagepixels) / self.viewPanel.viewer.Ypagepixels
+            scrolled.x = self.pageWidth * scrolled.x / self.viewPanel.viewer.Xpagepixels
+            scrolled.y = self.pageHeight - self.pageHeight * (scrolled.y % self.viewPanel.viewer.Ypagepixels) / self.viewPanel.viewer.Ypagepixels
             coordinate = Point(scrolled.x, scrolled.y)
-            print(coordinate.x, coordinate.y)
-            self.addPoints.append(coordinate)
         try:
-            self.validatedDimensions[index - 1].label_x = coordinate.x
-            self.validatedDimensions[index - 1].label_y = coordinate.y
+            self.validatedDimensions[index - 1].label_x = coordinate.x - draw.BOX_UNIT/2
+            self.validatedDimensions[index - 1].label_y = coordinate.y - draw.BOX_UNIT/2
             self.bubbled_pdf = open('Result.pdf', "wb")
             draw.print_dims(self.validatedDimensions, self.fileName, self.csv_text, self.bubbled_pdf)
             self.bubbled_pdf.close()

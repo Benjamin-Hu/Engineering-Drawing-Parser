@@ -34,7 +34,12 @@ def output_txt(file_path, save_file):
     interpreter = PDFPageInterpreter(rsrcmgr, device)
     page_number = 1
     for page in PDFPage.create_pages(doc):
+        sizeArray = page.mediabox
+        page_width = sizeArray[2]
+        page_height = sizeArray[3]
+        print(page_width, page_height)
         interpreter.process_page(page)
         layout = device.get_result()
         parse_layout(page_number, layout, save_file)
         page_number += 1
+    return page_width, page_height
