@@ -2,5 +2,6 @@
 .DS_Store
 .idea
 __pycache__
+dist
 *.txt
 *.pdf
